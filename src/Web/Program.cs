@@ -46,8 +46,6 @@ namespace Microsoft.eShopWeb.Web
                 {
                     webBuilder.UseStartup<Startup>();
 
-                    // Forzar siempre Production en App Service
-                    webBuilder.UseEnvironment("Production");
                 });
     }
 }
