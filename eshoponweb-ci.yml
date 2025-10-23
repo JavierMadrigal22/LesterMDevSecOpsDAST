@@ -1,0 +1,204 @@
+# ============================================
+# Azure DevOps Pipeline: Build + SonarQube + DAST (local ZAP) + DefectDojo
+# ============================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/web/*
+
+variables:
+  buildConfiguration: 'Release'
+
+  # Target app (DAST target)
+  webAppUrl: 'https://lestermlab-webapp-a8affsgzagg7cqh0.canadacentral-01.azurewebsites.net'
+
+  # DefectDojo
+  defectDojoUrl: 'http://podmandefectdojo.centralus.cloudapp.azure.com:8080/api/v2/import-scan/'
+  defectDojoApiKey: 'fbebc1e0b409e12ce0663ea7194781c5c7809358'   # RECOMENDADO: mover a variable secreta
+  defectDojoEngagementId: '1'                                   # Ajusta al engagement correcto si lo tienes
+
+  # DAST / ZAP
+  dastScanName: 'LesterMDAST'
+  # Asegúrate que esta ruta apunte a la carpeta donde esté zap.bat (no al Start Menu .lnk)
+  zapPath: 'C:\Program Files\OWASP\Zed Attack Proxy'
+
+stages:
+  - stage: Build
+    displayName: 'Build .NET 8 Solution'
+    jobs:
+      - job: Build
+        displayName: 'Build and Test'
+        pool:
+          name: default
+          demands: Agent.Name -equals devsecopslabswi
+        workspace:
+          clean: all
+        steps:
+          - task: SonarQubePrepare@7
+            displayName: 'Prepare SonarQube Analysis'
+            inputs:
+              SonarQube: 'SonarQube'
+              scannerMode: 'dotnet'
+              projectKey: 'LesterMLab'
+              projectName: 'LesterMLab'
+
+          - task: UseDotNet@2
+            displayName: 'Install .NET SDK 8.x'
+            inputs:
+              packageType: 'sdk'
+              version: '8.0.x'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore NuGet Packages'
+            inputs:
+              command: 'restore'
+              projects: '**/*.sln'
+
+          - powershell: |
+              Write-Host "Restoring client libraries with LibMan..."
+              cd "$(Build.SourcesDirectory)\src\Web"
+              if (!(Get-Command libman -ErrorAction SilentlyContinue)) {
+                  dotnet tool install -g Microsoft.Web.LibraryManager.Cli
+                  $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
+              }
+              libman restore
+            displayName: 'LibMan Restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build Solution'
+            inputs:
+              command: 'build'
+              projects: '**/*.sln'
+              arguments: '--configuration $(buildConfiguration)'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run Unit Tests'
+            inputs:
+              command: 'test'
+              projects: 'src/tests/UnitTests/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --logger trx'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Web Project'
+            inputs:
+              command: 'publish'
+              projects: 'src/Web/Web.csproj'
+              arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish Website Artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: 'Website'
+              publishLocation: 'pipeline'
+              overwrite: true
+
+  - stage: DAST
+    displayName: 'Dynamic Application Security Testing (ZAP)'
+    dependsOn: Build
+    jobs:
+      - job: DAST
+        displayName: 'Run local OWASP ZAP and upload to DefectDojo'
+        pool:
+          name: default
+          demands: Agent.Name -equals devsecopslabswi
+
+        steps:
+          # Ensure staging dir exists
+          - powershell: |
+              $staging = "$(Build.ArtifactStagingDirectory)"
+              if (-not (Test-Path $staging)) { New-Item -ItemType Directory -Path $staging -Force | Out-Null }
+              Write-Host "Artifact staging: $staging"
+            displayName: 'Prepare artifact staging dir'
+
+          # Locate and run zap.bat (robust search)
+          - powershell: |
+              Write-Host "Searching for zap executable under '$(zapPath)'..."
+              $base = "$(zapPath)"
+              if (-not (Test-Path $base)) {
+                Write-Error "Configured zapPath does not exist: $base. Please update zapPath variable to the real installation folder."
+                exit 10
+              }
+
+              # Try common locations first
+              $candidates = @()
+              $candidates += Join-Path $base "zap.bat"
+              $candidates += Join-Path $base "ZAP.bat"
+              $candidates += Join-Path $base "zap.exe"
+              $candidates += Join-Path $base "ZAP.exe"
+
+              # Also search recursively if not found
+              foreach ($p in $candidates) {
+                if (Test-Path $p) { $zapExe = $p; break }
+              }
+              if (-not $zapExe) {
+                $found = Get-ChildItem -Path $base -Filter 'zap.bat' -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+                if ($found) { $zapExe = $found }
+              }
+
+              if (-not $zapExe) {
+                Write-Error "Could not locate zap.bat or executable under $base. Please verify zapPath points to actual installation folder (e.g. 'C:\Program Files\OWASP\Zed Attack Proxy')."
+                exit 11
+              }
+
+              Write-Host "Found ZAP executable: $zapExe"
+
+              $outputFile = Join-Path "$(Build.ArtifactStagingDirectory)" "zap_report.json"
+              Write-Host "Running ZAP (quick scan) against: $(webAppUrl)"
+              & $zapExe -cmd -quickurl "$(webAppUrl)" -quickprogress -quickout $outputFile -quickformat json
+              $exitCode = $LASTEXITCODE
+              if ($exitCode -ne 0) {
+                Write-Warning "ZAP process exited with code $exitCode (this may happen if ZAP finds issues)."
+              }
+              if (-not (Test-Path $outputFile)) {
+                Write-Error "ZAP did not produce an output file at $outputFile"
+                exit 12
+              }
+              Write-Host "ZAP scan finished. Report: $outputFile"
+            displayName: 'Run OWASP ZAP (local installation)'
+
+          # Publish report as artifact
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish ZAP Report'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)\zap_report.json'
+              artifact: 'ZAPReport'
+
+          # Upload to DefectDojo
+          - powershell: |
+              Write-Host "Uploading scan results to DefectDojo..."
+              $apiUrl = "$(defectDojoUrl)"
+              $apiKey = "$(defectDojoApiKey)"
+              $engagement = "$(defectDojoEngagementId)"
+              $filePath = "$(Build.ArtifactStagingDirectory)\zap_report.json"
+
+              if (-not (Test-Path $filePath)) {
+                Write-Error "Report file not found: $filePath"
+                exit 20
+              }
+
+              $headers = @{ "Authorization" = "Token " + $apiKey }
+
+              $form = @{
+                engagement = $engagement
+                scan_type  = "ZAP Scan"
+                name       = "$(dastScanName)"
+                active     = "true"
+                verified   = "true"
+                file       = Get-Item $filePath
+              }
+
+              try {
+                $resp = Invoke-RestMethod -Uri $apiUrl -Headers $headers -Method Post -Form $form -TimeoutSec 300
+                Write-Host "Upload response:"
+                $resp | ConvertTo-Json -Depth 4 | Write-Host
+              } catch {
+                Write-Error "Failed to upload to DefectDojo: $($_.Exception.Message)"
+                exit 21
+              }
+
+            displayName: 'Upload ZAP JSON to DefectDojo'

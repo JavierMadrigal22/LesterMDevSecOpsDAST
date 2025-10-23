@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.4" version="1">
+
+  <components>
+    <!-- Infrastructure -->
+    <component type="library" bom-ref="nuget:Ardalis.EFCore.Extensions:1.1.0">
+      <name>Ardalis.EFCore.Extensions</name>
+      <version>1.1.0</version>
+      <purl>pkg:nuget/Ardalis.EFCore.Extensions@1.1.0</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Microsoft.AspNetCore.Identity.EntityFrameworkCore:8.0.0">
+      <name>Microsoft.AspNetCore.Identity.EntityFrameworkCore</name>
+      <version>8.0.0</version>
+      <purl>pkg:nuget/Microsoft.AspNetCore.Identity.EntityFrameworkCore@8.0.0</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Microsoft.EntityFrameworkCore.Analyzers:8.0.0">
+      <name>Microsoft.EntityFrameworkCore.Analyzers</name>
+      <version>8.0.0</version>
+      <purl>pkg:nuget/Microsoft.EntityFrameworkCore.Analyzers@8.0.0</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Microsoft.EntityFrameworkCore.SqlServer:8.0.0">
+      <name>Microsoft.EntityFrameworkCore.SqlServer</name>
+      <version>8.0.0</version>
+      <purl>pkg:nuget/Microsoft.EntityFrameworkCore.SqlServer@8.0.0</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Microsoft.EntityFrameworkCore.Tools:8.0.0">
+      <name>Microsoft.EntityFrameworkCore.Tools</name>
+      <version>8.0.0</version>
+      <purl>pkg:nuget/Microsoft.EntityFrameworkCore.Tools@8.0.0</purl>
+    </component>
+
+    <!-- ApplicationCore -->
+    <component type="library" bom-ref="nuget:Ardalis.GuardClauses:1.2.9">
+      <name>Ardalis.GuardClauses</name>
+      <version>1.2.9</version>
+      <purl>pkg:nuget/Ardalis.GuardClauses@1.2.9</purl>
+    </component>
+    <component type="library" bom-ref="nuget:System.Security.Claims:4.3.0">
+      <name>System.Security.Claims</name>
+      <version>4.3.0</version>
+      <purl>pkg:nuget/System.Security.Claims@4.3.0</purl>
+    </component>
+
+    <!-- UnitTests -->
+    <component type="library" bom-ref="nuget:Microsoft.CodeAnalysis.Common:4.8.0-3.final">
+      <name>Microsoft.CodeAnalysis.Common</name>
+      <version>4.8.0-3.final</version>
+      <purl>pkg:nuget/Microsoft.CodeAnalysis.Common@4.8.0-3.final</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Microsoft.CodeAnalysis.CSharp:4.8.0-3.final">
+      <name>Microsoft.CodeAnalysis.CSharp</name>
+      <version>4.8.0-3.final</version>
+      <purl>pkg:nuget/Microsoft.CodeAnalysis.CSharp@4.8.0-3.final</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Moq:4.20.72">
+      <name>Moq</name>
+      <version>4.20.72</version>
+      <purl>pkg:nuget/Moq@4.20.72</purl>
+    </component>
+    <component type="library" bom-ref="nuget:xunit:2.4.2">
+      <name>xunit</name>
+      <version>2.4.2</version>
+      <purl>pkg:nuget/xunit@2.4.2</purl>
+    </component>
+    <component type="library" bom-ref="nuget:Microsoft.NET.Test.Sdk:17.9.0">
+      <name>Microsoft.NET.Test.Sdk</name>
+      <version>17.9.0</version>
+      <purl>pkg:nuget/Microsoft.NET.Test.Sdk@17.9.0</purl>
+    </component>
+
+    <!-- Puedes agregar IntegrationTests y FunctionalTests de forma similar -->
+
+  </components>
+
+</bom>
