@@ -10,7 +10,10 @@ jobs:
   build-and-deploy:
     runs-on: windows-latest
     permissions:
-      contents: read  # necesario para checkout
+      contents: read
+
+    env:
+      ASPNETCORE_ENVIRONMENT: Production  # 👈 fuerza el entorno aquí
 
     steps:
       - uses: actions/checkout@v4
